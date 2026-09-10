@@ -12,7 +12,7 @@ redeploy.
 
 Esse padrão não funciona neste desenho. A função roda nas **subnets privadas**, que
 por decisão de custo **não têm NAT Gateway** (ver
-[ADR-0005](../../../oficina-infra-k8s/docs/adr/0005-restricoes-aws-academy.md)).
+[ADR-0005](https://github.com/Xikin/oficina-infra-k8s/blob/main/docs/adr/0005-restricoes-aws-academy.md)).
 Uma Lambda dentro da VPC só alcança a internet por NAT, e só alcança serviços da AWS
 sem NAT através de **VPC Endpoints de interface** — que custam ~US$0,24/dia cada, e
 seriam necessários dois (SSM e KMS).

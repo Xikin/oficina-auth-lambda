@@ -11,9 +11,9 @@ resto para a API que roda no EKS.
 | Repositório | Papel |
 | --- | --- |
 | **oficina-auth-lambda** (este) | Function serverless de autenticação por CPF + API Gateway |
-| [oficina-infra-k8s](../oficina-infra-k8s) | VPC + cluster EKS + metrics-server |
-| [oficina-infra-db](../oficina-infra-db) | RDS PostgreSQL gerenciado |
-| [oficina-mvp](../oficina-mvp) | Aplicação principal executando no cluster |
+| [oficina-infra-k8s](https://github.com/Xikin/oficina-infra-k8s) | VPC + cluster EKS + metrics-server |
+| [oficina-infra-db](https://github.com/Xikin/oficina-infra-db) | RDS PostgreSQL gerenciado |
+| [oficina-mvp](https://github.com/Xikin/tech_challenge) | Aplicação principal executando no cluster |
 
 ---
 
@@ -190,11 +190,11 @@ correlação com os logs.
 ### Swagger / Postman
 
 A especificação completa da plataforma (esta rota e todas as da aplicação) está em
-[oficina-mvp](../oficina-mvp):
+[oficina-mvp](https://github.com/Xikin/tech_challenge):
 
 - Swagger UI: `<API_GATEWAY_URL>/docs`
-- OpenAPI: [`docs/openapi.json`](../oficina-mvp/docs/openapi.json)
-- Collection Postman: [`postman/`](../oficina-mvp/postman)
+- OpenAPI: [`docs/openapi.json`](https://github.com/Xikin/tech_challenge/blob/main/docs/openapi.json)
+- Collection Postman: [`postman/`](https://github.com/Xikin/tech_challenge/blob/main/postman)
 
 ---
 
@@ -286,5 +286,5 @@ aws logs tail /aws/lambda/oficina-prod-auth --follow --format short
 ## Documentação
 
 - [ADR-0006 — Segredos injetados no deploy](docs/adr/0006-segredos-da-lambda.md)
-- [RFC-0003 — Estratégia de autenticação por CPF](../oficina-mvp/docs/rfc/0003-estrategia-de-autenticacao.md)
-- [Documentação de arquitetura consolidada](../oficina-mvp/docs/arquitetura.md)
+- [RFC-0003 — Estratégia de autenticação por CPF](https://github.com/Xikin/tech_challenge/blob/main/docs/rfc/0003-estrategia-de-autenticacao.md)
+- [Documentação de arquitetura consolidada](https://github.com/Xikin/tech_challenge/blob/main/docs/arquitetura.md)
