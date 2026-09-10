@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+lambda.zip
+*.tsbuildinfo
+
+# Terraform
+terraform/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+.env
+.DS_Store
