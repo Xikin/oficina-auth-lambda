@@ -33,7 +33,7 @@ function status(res: Awaited<ReturnType<typeof handler>>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.JWT_SECRET = SEGREDO;
+  process.env.JWT_CLIENTE_SECRET = SEGREDO;
   process.env.JWT_EXPIRES_IN = '8h';
   // Silencia o log estruturado durante os testes.
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -104,7 +104,7 @@ describe('POST /auth/cpf — passo 3: emissão do token', () => {
     });
   });
 
-  it('devolve 200 com um JWT verificável pelo segredo compartilhado', async () => {
+  it('devolve 200 com um JWT verificável pelo segredo do emissor de clientes', async () => {
     const res = await handler(evento({ cpf: CPF_VALIDO }), contexto);
     expect(status(res)).toBe(200);
 
@@ -135,8 +135,8 @@ describe('POST /auth/cpf — passo 3: emissão do token', () => {
     expect(JSON.stringify(body.cliente)).not.toContain(CPF_VALIDO);
   });
 
-  it('devolve 500 quando JWT_SECRET não está configurado', async () => {
-    delete process.env.JWT_SECRET;
+  it('devolve 500 quando JWT_CLIENTE_SECRET não está configurado', async () => {
+    delete process.env.JWT_CLIENTE_SECRET;
     const res = await handler(evento({ cpf: CPF_VALIDO }), contexto);
     expect(status(res)).toBe(500);
     expect(corpo(res).code).toBe('MISCONFIGURED');

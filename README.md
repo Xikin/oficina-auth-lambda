@@ -118,6 +118,15 @@ de pessoa física não deve aceitar documento de pessoa jurídica.
 **CPF nunca aparece em log.** `mascararCPF` reduz para `***.***.247-25` antes de
 qualquer linha de log, e o corpo da resposta devolve apenas `id` e `nome` do cliente.
 
+**Segredo próprio, não o da API.** A função assina com `JWT_CLIENTE_SECRET`, diferente do
+`JWT_SECRET` do login interno, e a API só aceita deste emissor tokens com `role: CLIENTE`.
+Quem obtiver a configuração desta função consegue, no máximo, se passar por um cliente —
+nunca por um administrador ([ADR-0011](https://github.com/Xikin/tech_challenge/blob/main/docs/adr/0011-segredos-jwt-por-emissor.md)).
+
+**Concorrência reservada.** A função tem teto de 10 execuções simultâneas
+(`lambda_reserved_concurrency`). Sem ele, uma força bruta de CPF escalaria até o limite da
+conta e esgotaria as conexões do RDS, derrubando a API junto.
+
 **Segredos por variável de ambiente.** Ver
 [ADR-0006](docs/adr/0006-segredos-da-lambda.md) — a subnet privada não tem NAT nem
 VPC Endpoint, então ler o Secrets Manager em runtime seria impossível sem custo fixo
@@ -166,7 +175,7 @@ adicional.
 | 422 | `CPF_INVALID` | dígito verificador não confere |
 | 404 | `CLIENT_NOT_FOUND` | CPF válido, mas sem cadastro |
 | 403 | `CLIENT_INACTIVE` | cliente existe, porém inativo |
-| 500 | `MISCONFIGURED` | `JWT_SECRET` ausente na função |
+| 500 | `MISCONFIGURED` | `JWT_CLIENTE_SECRET` ausente na função |
 | 503 | `AUTH_UNAVAILABLE` | RDS inacessível ou timeout |
 
 Toda resposta — inclusive as de erro — devolve o header `x-request-id` para
@@ -232,7 +241,7 @@ terraform init \
   -backend-config="region=us-east-1" \
   -backend-config="key=auth-lambda/prod/terraform.tfstate"
 
-export TF_VAR_jwt_secret='<o MESMO JWT_SECRET da API>'
+export TF_VAR_jwt_cliente_secret='<o MESMO JWT_CLIENTE_SECRET da API>'
 terraform apply
 
 terraform output -raw exemplo_curl
@@ -258,9 +267,9 @@ prova que gateway e função estão de pé sem depender de haver cliente no banc
 | `AWS_SECRET_ACCESS_KEY` | idem |
 | `AWS_SESSION_TOKEN` | idem — **expira a cada 4h** |
 | `TF_STATE_BUCKET` | `oficina-infra-k8s/bootstrap/backend.sh` |
-| `JWT_SECRET` | **exatamente o mesmo** configurado na API — mínimo 32 caracteres |
+| `JWT_CLIENTE_SECRET` | **exatamente o mesmo** `JWT_CLIENTE_SECRET` da API — nunca o `JWT_SECRET` dela |
 
-> Se o `JWT_SECRET` divergir entre esta função e a API, o token é emitido com
+> Se o `JWT_CLIENTE_SECRET` divergir entre esta função e a API, o token é emitido com
 > sucesso e **rejeitado silenciosamente** na primeira rota protegida. É a falha mais
 > difícil de diagnosticar neste projeto.
 

@@ -6,7 +6,7 @@
 ## Contexto
 
 A Lambda de autenticação precisa de dois segredos: a `DATABASE_URL` do RDS e o
-`JWT_SECRET` compartilhado com a API. O padrão recomendado pela AWS é buscá-los em
+`JWT_CLIENTE_SECRET`, exclusivo do emissor de clientes ([ADR-0011](https://github.com/Xikin/tech_challenge/blob/main/docs/adr/0011-segredos-jwt-por-emissor.md)). O padrão recomendado pela AWS é buscá-los em
 runtime no Secrets Manager ou no SSM Parameter Store, para que a rotação não exija
 redeploy.
 
@@ -29,7 +29,7 @@ variáveis de ambiente** da função:
 environment {
   variables = {
     DATABASE_URL = data.aws_ssm_parameter.database_url.value  # SecureString, decifrada no apply
-    JWT_SECRET   = var.jwt_secret                             # TF_VAR_jwt_secret no pipeline
+    JWT_CLIENTE_SECRET = var.jwt_cliente_secret               # TF_VAR_jwt_cliente_secret no pipeline
   }
 }
 ```
@@ -55,7 +55,7 @@ gerenciada da AWS por padrão.
 - Bucket de state com `BlockPublicAcls`, SSE e acesso restrito à conta.
 - Senha do banco gerada pelo Terraform e nunca impressa em log de pipeline (o
   workflow imprime apenas o *nome* do parâmetro SSM, nunca o valor).
-- `JWT_SECRET` entra por `TF_VAR_jwt_secret` a partir de um secret do GitHub,
+- `JWT_CLIENTE_SECRET` entra por `TF_VAR_jwt_cliente_secret` a partir de um secret do GitHub,
   nunca versionado.
 
 ## Reavaliar se

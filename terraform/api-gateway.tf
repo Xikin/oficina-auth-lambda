@@ -101,13 +101,15 @@ resource "aws_apigatewayv2_stage" "this" {
     # JSON de uma linha: é o formato que o New Relic e o CloudWatch Logs
     # Insights conseguem consultar por campo sem regex.
     format = jsonencode({
-      requestId         = "$context.requestId"
-      correlationId     = "$context.requestId"
-      ip                = "$context.identity.sourceIp"
-      requestTime       = "$context.requestTime"
-      httpMethod        = "$context.httpMethod"
-      routeKey          = "$context.routeKey"
-      path              = "$context.path"
+      requestId     = "$context.requestId"
+      correlationId = "$context.requestId"
+      ip            = "$context.identity.sourceIp"
+      requestTime   = "$context.requestTime"
+      httpMethod    = "$context.httpMethod"
+      routeKey      = "$context.routeKey"
+      # Sem `path`: a URL crua carrega CPF/CNPJ em /clientes/cpf-cnpj/:documento.
+      # O caminho completo, já mascarado, fica no log da aplicação, ligado a
+      # esta linha pelo requestId.
       status            = "$context.status"
       protocol          = "$context.protocol"
       responseLength    = "$context.responseLength"

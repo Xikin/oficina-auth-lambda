@@ -16,6 +16,10 @@ concurrency:
   group: auth-lambda-${{ github.ref_name }}
   cancel-in-progress: false
 
+# Menor privilégio por padrão: o GITHUB_TOKEN só lê o repositório.
+permissions:
+  contents: read
+
 env:
   AWS_REGION: us-east-1
   TF_VERSION: "1.10.5"
@@ -140,16 +144,16 @@ jobs:
         if: ${{ !inputs.destroy }}
         working-directory: terraform
         env:
-          # Precisa ser exatamente o mesmo JWT_SECRET da API, senão o token
-          # emitido aqui é rejeitado lá.
-          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          # Igual ao JWT_CLIENTE_SECRET da API e DIFERENTE do JWT_SECRET dela
+          # (ADR-0011 em oficina-mvp).
+          TF_VAR_jwt_cliente_secret: ${{ secrets.JWT_CLIENTE_SECRET }}
         run: terraform apply -input=false -auto-approve
 
       - name: Terraform destroy
         if: ${{ inputs.destroy }}
         working-directory: terraform
         env:
-          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_jwt_cliente_secret: ${{ secrets.JWT_CLIENTE_SECRET }}
         run: terraform destroy -input=false -auto-approve
 
       - name: Coletar saídas

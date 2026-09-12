@@ -119,9 +119,12 @@ export async function handler(
     }
 
     // ---- Passo 3: emitir o token -----------------------------------------
-    const segredo = process.env.JWT_SECRET;
+    // Segredo exclusivo do emissor de clientes. NÃO é o JWT_SECRET da API: com
+    // um segredo compartilhado, quem lesse a configuração desta função forjaria
+    // tokens de ADMIN (ADR-0011 em oficina-mvp).
+    const segredo = process.env.JWT_CLIENTE_SECRET;
     if (!segredo) {
-      log.error('JWT_SECRET ausente na configuração da função', ctx, null);
+      log.error('JWT_CLIENTE_SECRET ausente na configuração da função', ctx, null);
       return erro(
         { status: 500, codigo: 'MISCONFIGURED', mensagem: 'Erro interno do servidor' },
         correlationId,

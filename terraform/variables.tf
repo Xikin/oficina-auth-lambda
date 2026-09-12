@@ -49,18 +49,35 @@ variable "lambda_timeout_s" {
   default     = 10
 }
 
-variable "jwt_secret" {
+variable "jwt_cliente_secret" {
   description = <<-EOT
-    Segredo compartilhado com a API para assinar/validar o JWT.
-    Precisa ser IDÊNTICO ao JWT_SECRET da aplicação, senão o token emitido aqui
-    é rejeitado lá. Fornecido via TF_VAR_jwt_secret no pipeline.
+    Segredo do emissor de tokens de CLIENTE.
+    Precisa ser IDÊNTICO ao JWT_CLIENTE_SECRET da API e DIFERENTE do JWT_SECRET
+    dela — a API recusa tokens deste emissor que aleguem qualquer papel além de
+    CLIENTE (ADR-0011 em oficina-mvp). Fornecido via TF_VAR_jwt_cliente_secret.
   EOT
   type        = string
   sensitive   = true
 
   validation {
-    condition     = length(var.jwt_secret) >= 32
-    error_message = "JWT_SECRET deve ter no mínimo 32 caracteres."
+    condition     = length(var.jwt_cliente_secret) >= 32
+    error_message = "JWT_CLIENTE_SECRET deve ter no mínimo 32 caracteres."
+  }
+}
+
+variable "lambda_reserved_concurrency" {
+  description = <<-EOT
+    Teto de execuções simultâneas da função. Sem ele, uma força bruta de CPF
+    escala até o limite da conta e esgota as conexões do db.t3.micro,
+    derrubando a API junto. Use -1 para remover a reserva: a AWS exige manter
+    10 execuções não reservadas, o que falha em contas com cota baixa.
+  EOT
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.lambda_reserved_concurrency == -1 || var.lambda_reserved_concurrency >= 1
+    error_message = "Use -1 (sem reserva) ou um valor maior ou igual a 1."
   }
 }
 

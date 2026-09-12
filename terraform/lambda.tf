@@ -21,6 +21,10 @@ resource "aws_lambda_function" "auth" {
   memory_size = var.lambda_memory_mb
   timeout     = var.lambda_timeout_s
 
+  # Limita o estrago de uma força bruta: sem teto, a função escala até o limite
+  # da conta e esgota as conexões do RDS, derrubando também a API.
+  reserved_concurrent_executions = var.lambda_reserved_concurrency
+
   # Sem a ENI na VPC a função não alcança o RDS, que vive em subnet privada.
   vpc_config {
     subnet_ids = local.private_subnet_ids
@@ -32,10 +36,10 @@ resource "aws_lambda_function" "auth" {
     variables = {
       # Ver ADR-0006: injetado no deploy em vez de lido do Secrets Manager em
       # runtime, porque a subnet privada não tem NAT nem VPC Endpoint.
-      DATABASE_URL   = data.aws_ssm_parameter.database_url.value
-      JWT_SECRET     = var.jwt_secret
-      JWT_EXPIRES_IN = var.jwt_expires_in
-      APP_ENV        = var.environment
+      DATABASE_URL       = data.aws_ssm_parameter.database_url.value
+      JWT_CLIENTE_SECRET = var.jwt_cliente_secret
+      JWT_EXPIRES_IN     = var.jwt_expires_in
+      APP_ENV            = var.environment
     }
   }
 
