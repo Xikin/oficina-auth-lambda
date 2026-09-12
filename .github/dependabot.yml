@@ -1,0 +1,25 @@
+# As actions são fixadas por SHA de commit; o Dependabot mantém os SHAs
+# atualizados. Sem ele, o pin congelaria as actions para sempre.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-e-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: terraform
+    directory: /terraform
+    schedule:
+      interval: weekly
