@@ -25,7 +25,9 @@ output "gateway_log_group" {
 
 output "api_backend" {
   description = "Backend para onde o gateway roteia as rotas da aplicação"
-  value       = local.api_endpoint
+  # O provider marca todo valor lido de SSM como sensível. Este é só o hostname
+  # público do Load Balancer — não é segredo —, então é seguro exibi-lo.
+  value = nonsensitive(local.api_endpoint)
 }
 
 output "exemplo_curl" {

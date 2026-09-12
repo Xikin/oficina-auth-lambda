@@ -14,3 +14,7 @@ crash.log
 
 .env
 .DS_Store
+
+# plano salvo por `terraform plan -out` (contém valores sensíveis)
+tfplan
+terraform/tfplan
