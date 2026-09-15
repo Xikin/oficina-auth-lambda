@@ -48,6 +48,27 @@ mais. `email` é opcional porque `Cliente.email` é nullable.
 - Nunca passe CPF, senha ou token ao logger — use `mascararCPF` antes.
 - `warn` e `error` vão para stderr: o CloudWatch e o New Relic distinguem os streams.
 
+### `src/encaminhador-logs.ts`
+
+Função separada que leva ao New Relic os logs que ficam no CloudWatch: os da função de autenticação e o access
+log do API Gateway.
+
+- **Por que uma função própria.** A função de autenticação roda em subnet privada, sem NAT, e não alcança a
+  internet; a extensão do New Relic para Lambda não conseguiria enviar nada de dentro dela. O encaminhador oficial do
+  New Relic e o Kinesis Firehose exigem criar IAM roles, o que o Learner Lab não permite. Esta função roda fora da
+  VPC, com a LabRole, e é assinada nos dois log groups.
+- **Duas camadas de JSON.** Com `log_format = "JSON"`, a Lambda embrulha cada `console.log` num objeto próprio
+  (`level` em maiúsculas, `requestId`, `message`), e a linha da aplicação vem dentro de `message`, também em JSON.
+  O encaminhador abre as duas camadas e os campos da aplicação prevalecem, para que `level = 'warn'` e
+  `message = 'autenticação por CPF concluída'` batam com as consultas do dashboard. O access log do gateway já é
+  JSON de uma camada só.
+- Objetos aninhados viram atributos com ponto (`erro.nome`) até 5 níveis; listas e níveis mais profundos são
+  serializados como texto.
+- Todo lote recebe `aws.logGroup` e `aws.logStream`, que é por onde o dashboard separa o access log do gateway.
+- A mensagem de controle (`CONTROL_MESSAGE`), que a AWS envia ao criar a assinatura, é ignorada.
+- Se o New Relic recusar o lote, a função lança erro: a assinatura invoca a Lambda de forma assíncrona, e a
+  Lambda tenta de novo.
+
 ### `tests/cpf.test.ts`
 
 O caso de CNPJ usa um CNPJ válido — que o validador da API aceitaria, porque trata os dois documentos — para provar
@@ -77,6 +98,15 @@ que a Lambda o recusa.
 - `DATABASE_URL` e `JWT_CLIENTE_SECRET` são injetados no deploy, em vez de lidos do Secrets Manager em runtime,
   porque a subnet privada não tem NAT nem VPC Endpoint ([ADR-0006](adr/0006-segredos-da-lambda.md)).
 - `log_format = "JSON"`: o handler já emite JSON; a configuração alinha os logs da plataforma.
+
+### `terraform/newrelic-logs.tf`
+
+- Tudo neste arquivo só é criado quando `new_relic_license_key` está preenchida (secret `NEW_RELIC_LICENSE_KEY`).
+  Sem ela, o deploy segue igual e os logs ficam só no CloudWatch.
+- O `nonsensitive` no teste da variável existe porque o Terraform não aceita valor sensível em `count` e
+  `for_each`. Só o resultado booleano deixa de ser sensível; a chave continua protegida no plan e no state.
+- A permissão para `logs.amazonaws.com` invocar o encaminhador é restrita a cada log group assinado (`source_arn`).
+- O encaminhador tem log group próprio, que não é assinado, para não reenviar os próprios logs em ciclo.
 
 ### `terraform/versions.tf`
 

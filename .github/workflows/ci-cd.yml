@@ -59,7 +59,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: lambda-zip
-          path: lambda.zip
+          path: |
+            lambda.zip
+            encaminhador-logs.zip
           retention-days: 7
 
       - name: Publicar cobertura
@@ -145,6 +147,7 @@ jobs:
         working-directory: terraform
         env:
           TF_VAR_jwt_cliente_secret: ${{ secrets.JWT_CLIENTE_SECRET }}
+          TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
         run: terraform apply -input=false -auto-approve
 
       - name: Terraform destroy
@@ -152,6 +155,7 @@ jobs:
         working-directory: terraform
         env:
           TF_VAR_jwt_cliente_secret: ${{ secrets.JWT_CLIENTE_SECRET }}
+          TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
         run: terraform destroy -input=false -auto-approve
 
       - name: Coletar saídas
