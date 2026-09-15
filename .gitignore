@@ -4,7 +4,6 @@ coverage/
 lambda.zip
 *.tsbuildinfo
 
-# Terraform
 terraform/.terraform/
 *.tfstate
 *.tfstate.*
@@ -15,6 +14,5 @@ crash.log
 .env
 .DS_Store
 
-# plano salvo por `terraform plan -out` (contém valores sensíveis)
 tfplan
 terraform/tfplan

@@ -16,7 +16,6 @@ concurrency:
   group: auth-lambda-${{ github.ref_name }}
   cancel-in-progress: false
 
-# Menor privilégio por padrão: o GITHUB_TOKEN só lê o repositório.
 permissions:
   contents: read
 
@@ -125,8 +124,6 @@ jobs:
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: ${{ env.TF_VERSION }}
-          # Sem o wrapper, $(terraform output -raw ...) devolve só o valor. Com ele,
-          # vêm linhas extras, e a URL do smoke test sairia corrompida.
           terraform_wrapper: false
 
       - name: Terraform init
@@ -147,8 +144,6 @@ jobs:
         if: ${{ !inputs.destroy }}
         working-directory: terraform
         env:
-          # Igual ao JWT_CLIENTE_SECRET da API e DIFERENTE do JWT_SECRET dela
-          # (ADR-0011 em oficina-mvp).
           TF_VAR_jwt_cliente_secret: ${{ secrets.JWT_CLIENTE_SECRET }}
         run: terraform apply -input=false -auto-approve
 
@@ -167,9 +162,6 @@ jobs:
           echo "api_url=$(terraform output -raw api_gateway_url)" >> "$GITHUB_OUTPUT"
           echo "auth_endpoint=$(terraform output -raw auth_endpoint)" >> "$GITHUB_OUTPUT"
 
-      # Smoke test real contra o ambiente recém-publicado: um CPF sintaticamente
-      # inválido deve devolver 422. Prova que gateway -> lambda está de pé sem
-      # depender de haver cliente cadastrado no banco.
       - name: Smoke test da autenticação
         if: ${{ !inputs.destroy }}
         run: |

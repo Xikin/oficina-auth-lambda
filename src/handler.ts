@@ -4,15 +4,6 @@ import { buscarClientePorCPF } from './db.js';
 import { emitirToken } from './token.js';
 import { log, type ContextoLog } from './logger.js';
 
-/**
- * POST /auth/cpf
- *
- * Os três passos exigidos pela Fase 3, nesta ordem:
- *   1. valida o CPF (dígito verificador) — falha antes de tocar no banco;
- *   2. consulta existência e status do cliente na base;
- *   3. gera e devolve um JWT válido para as APIs protegidas.
- */
-
 interface Falha {
   status: number;
   codigo: string;
@@ -24,8 +15,6 @@ function resposta(status: number, corpo: unknown, correlationId: string): APIGat
     statusCode: status,
     headers: {
       'content-type': 'application/json',
-      // Devolvido para que o cliente consiga citar o id ao reportar um problema,
-      // e para que o New Relic ligue esta resposta às linhas de log.
       'x-request-id': correlationId,
       'cache-control': 'no-store',
     },
@@ -45,8 +34,6 @@ export async function handler(
   event: APIGatewayProxyEventV2,
   context: Context,
 ): Promise<APIGatewayProxyResultV2> {
-  // Correlação ponta a ponta: honra o x-request-id que o chamador mandou e,
-  // na ausência dele, cai para o id que o API Gateway já gerou.
   const correlationId =
     event.headers?.['x-request-id'] ??
     event.headers?.['X-Request-Id'] ??
@@ -62,7 +49,6 @@ export async function handler(
   const inicio = Date.now();
 
   try {
-    // ---- Passo 1: validar o CPF ------------------------------------------
     let corpo: { cpf?: unknown };
     try {
       corpo = JSON.parse(event.body ?? '{}');
@@ -85,7 +71,6 @@ export async function handler(
     const cpf = limparCPF(corpo.cpf);
 
     if (!validarCPF(cpf)) {
-      // 422: a requisição está bem formada, o CPF é que não é válido.
       log.warn('CPF reprovado na validação de dígito verificador', {
         ...ctx,
         cpf: mascararCPF(cpf),
@@ -93,7 +78,6 @@ export async function handler(
       return erro({ status: 422, codigo: 'CPF_INVALID', mensagem: 'CPF inválido' }, correlationId);
     }
 
-    // ---- Passo 2: consultar existência e status --------------------------
     const cliente = await buscarClientePorCPF(cpf);
 
     if (!cliente) {
@@ -105,8 +89,6 @@ export async function handler(
     }
 
     if (!cliente.ativo) {
-      // 403 e não 404: o cliente existe, mas está inativo. Distinguir os dois
-      // casos é o que o requisito chama de "consultar existência E status".
       log.warn('cliente inativo', { ...ctx, clienteId: cliente.id });
       return erro(
         {
@@ -118,10 +100,6 @@ export async function handler(
       );
     }
 
-    // ---- Passo 3: emitir o token -----------------------------------------
-    // Segredo exclusivo do emissor de clientes. NÃO é o JWT_SECRET da API: com
-    // um segredo compartilhado, quem lesse a configuração desta função forjaria
-    // tokens de ADMIN (ADR-0011 em oficina-mvp).
     const segredo = process.env.JWT_CLIENTE_SECRET;
     if (!segredo) {
       log.error('JWT_CLIENTE_SECRET ausente na configuração da função', ctx, null);
@@ -154,8 +132,6 @@ export async function handler(
       correlationId,
     );
   } catch (e) {
-    // Falha de rede/timeout com o RDS cai aqui. 503 sinaliza ao chamador que
-    // vale tentar de novo, ao contrário de um 500 genérico.
     log.error(
       'falha ao processar autenticação por CPF',
       { ...ctx, duracaoMs: Date.now() - inicio },

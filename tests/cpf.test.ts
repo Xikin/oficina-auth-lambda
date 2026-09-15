@@ -26,7 +26,6 @@ describe('validarCPF', () => {
   });
 
   it('rejeita CNPJ — autenticação por CPF é só de pessoa física', () => {
-    // CNPJ válido: seria aceito pelo validador da API, que trata os dois casos.
     expect(validarCPF('11.222.333/0001-81')).toBe(false);
   });
 

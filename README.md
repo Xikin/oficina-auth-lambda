@@ -294,6 +294,7 @@ aws logs tail /aws/lambda/oficina-prod-auth --follow --format short
 
 ## Documentação
 
+- [Notas de implementação](docs/notas-de-implementacao.md) — o porquê das escolhas do código e da configuração, por arquivo
 - [ADR-0006 — Segredos injetados no deploy](docs/adr/0006-segredos-da-lambda.md)
 - [RFC-0003 — Estratégia de autenticação por CPF](https://github.com/Xikin/tech_challenge/blob/main/docs/rfc/0003-estrategia-de-autenticacao.md)
 - [Documentação de arquitetura consolidada](https://github.com/Xikin/tech_challenge/blob/main/docs/arquitetura.md)
