@@ -9,7 +9,8 @@
   },
   "scripts": {
     "build": "esbuild src/handler.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.mjs --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
-    "package": "npm run build && cd dist && zip -qr ../lambda.zip index.mjs && cd .. && echo \"lambda.zip: $(du -h lambda.zip | cut -f1)\"",
+    "build:encaminhador": "esbuild src/encaminhador-logs.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/encaminhador-logs/index.mjs",
+    "package": "npm run build && npm run build:encaminhador && (cd dist && zip -qr ../lambda.zip index.mjs) && (cd dist/encaminhador-logs && zip -qr ../../encaminhador-logs.zip index.mjs) && echo \"lambda.zip: $(du -h lambda.zip | cut -f1) | encaminhador-logs.zip: $(du -h encaminhador-logs.zip | cut -f1)\"",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

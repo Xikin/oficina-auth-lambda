@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 lambda.zip
+encaminhador-logs.zip
 *.tsbuildinfo
 
 terraform/.terraform/
