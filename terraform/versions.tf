@@ -37,10 +37,6 @@ data "aws_iam_role" "lab" {
   name = var.lab_role_name
 }
 
-# ---------------------------------------------------------------------------
-# Contratos vindos das outras stacks
-# ---------------------------------------------------------------------------
-
 data "aws_ssm_parameter" "private_subnet_ids" {
   name = "${local.ssm_prefix}/network/private_subnet_ids"
 }
@@ -54,7 +50,6 @@ data "aws_ssm_parameter" "database_url" {
   with_decryption = true
 }
 
-# Preenchido pelo pipeline de deploy da API depois que o Load Balancer sobe.
 data "aws_ssm_parameter" "api_endpoint" {
   name = "${local.ssm_prefix}/api/endpoint"
 }

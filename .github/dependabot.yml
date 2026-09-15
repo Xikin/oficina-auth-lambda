@@ -1,5 +1,3 @@
-# As actions são fixadas por SHA de commit; o Dependabot mantém os SHAs
-# atualizados. Sem ele, o pin congelaria as actions para sempre.
 version: 2
 updates:
   - package-ecosystem: github-actions

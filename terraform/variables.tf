@@ -110,3 +110,22 @@ variable "cors_allow_origins" {
   type        = list(string)
   default     = ["*"]
 }
+
+variable "new_relic_license_key" {
+  description = "License key (INGEST - LICENSE) do New Relic. Vazia, os logs da função e do gateway ficam só no CloudWatch."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "new_relic_log_api_url" {
+  description = "Endpoint da Log API do New Relic (região US)"
+  type        = string
+  default     = "https://log-api.newrelic.com/log/v1"
+}
+
+variable "encaminhador_zip_path" {
+  description = "Caminho do artefato do encaminhador de logs gerado por `npm run package`"
+  type        = string
+  default     = "../encaminhador-logs.zip"
+}

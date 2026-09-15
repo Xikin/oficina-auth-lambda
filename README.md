@@ -268,6 +268,7 @@ prova que gateway e função estão de pé sem depender de haver cliente no banc
 | `AWS_SESSION_TOKEN` | idem — **expira a cada 4h** |
 | `TF_STATE_BUCKET` | `oficina-infra-k8s/bootstrap/backend.sh` |
 | `JWT_CLIENTE_SECRET` | **exatamente o mesmo** `JWT_CLIENTE_SECRET` da API — nunca o `JWT_SECRET` dela |
+| `NEW_RELIC_LICENSE_KEY` | opcional — a mesma *INGEST - LICENSE* usada na API; sem ela, os logs ficam só no CloudWatch |
 
 > Se o `JWT_CLIENTE_SECRET` divergir entre esta função e a API, o token é emitido com
 > sucesso e **rejeitado silenciosamente** na primeira rota protegida. É a falha mais
@@ -279,10 +280,14 @@ prova que gateway e função estão de pé sem depender de haver cliente no banc
 
 | Sinal | Onde |
 | --- | --- |
-| Logs estruturados JSON | CloudWatch `/aws/lambda/oficina-<env>-auth` |
-| Access logs do gateway | CloudWatch `/aws/apigateway/oficina-<env>` |
+| Logs estruturados JSON | CloudWatch `/aws/lambda/oficina-<env>-auth` e New Relic Logs |
+| Access logs do gateway | CloudWatch `/aws/apigateway/oficina-<env>` e New Relic Logs |
 | Traces | AWS X-Ray (`tracing_config` ativo) |
 | Latência, erros, cold start | Métricas nativas da Lambda e do API Gateway |
+
+Os dois log groups são assinados pela função `oficina-<env>-newrelic-logs`, que envia cada linha à Log API
+do New Relic com os campos do JSON como atributos. Ela só é criada quando o secret `NEW_RELIC_LICENSE_KEY`
+existe no repositório.
 
 Todas as linhas carregam `requestId` (o `awsRequestId`) e `correlationId` (o
 `x-request-id` propagado), o que permite seguir uma requisição do gateway até o log
@@ -294,6 +299,7 @@ aws logs tail /aws/lambda/oficina-prod-auth --follow --format short
 
 ## Documentação
 
+- [Notas de implementação](docs/notas-de-implementacao.md) — o porquê das escolhas do código e da configuração, por arquivo
 - [ADR-0006 — Segredos injetados no deploy](docs/adr/0006-segredos-da-lambda.md)
 - [RFC-0003 — Estratégia de autenticação por CPF](https://github.com/Xikin/tech_challenge/blob/main/docs/rfc/0003-estrategia-de-autenticacao.md)
 - [Documentação de arquitetura consolidada](https://github.com/Xikin/tech_challenge/blob/main/docs/arquitetura.md)
