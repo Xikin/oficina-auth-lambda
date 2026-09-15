@@ -35,7 +35,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_CLIENTE_SECRET = SEGREDO;
   process.env.JWT_EXPIRES_IN = '8h';
-  // Silencia o log estruturado durante os testes.
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
