@@ -37,25 +37,30 @@ data "aws_iam_role" "lab" {
   name = var.lab_role_name
 }
 
-data "aws_ssm_parameter" "private_subnet_ids" {
-  name = "${local.ssm_prefix}/network/private_subnet_ids"
+data "aws_ssm_parameter" "endpoint" {
+  for_each = toset(["os", "execucao", "billing"])
+  name     = "${local.ssm_prefix}/${each.key}/endpoint"
 }
 
-data "aws_ssm_parameter" "db_client_security_group_id" {
-  name = "${local.ssm_prefix}/db/client_security_group_id"
-}
-
-data "aws_ssm_parameter" "database_url" {
-  name            = "${local.ssm_prefix}/db/database_url"
+data "aws_ssm_parameter" "integracao_api_key" {
+  name            = "${local.ssm_prefix}/auth/integracao_api_key"
   with_decryption = true
 }
 
-data "aws_ssm_parameter" "api_endpoint" {
-  name = "${local.ssm_prefix}/api/endpoint"
-}
-
 locals {
-  private_subnet_ids = split(",", data.aws_ssm_parameter.private_subnet_ids.value)
-  db_client_sg_id    = data.aws_ssm_parameter.db_client_security_group_id.value
-  api_endpoint       = data.aws_ssm_parameter.api_endpoint.value
+  endpoints = { for servico, p in data.aws_ssm_parameter.endpoint : servico => p.value }
+
+  rotas_por_servico = {
+    execucao = ["execucoes", "servicos", "pecas"]
+    billing  = ["orcamentos", "pagamentos"]
+  }
+
+  rotas = merge([
+    for servico, prefixos in local.rotas_por_servico : merge([
+      for prefixo in prefixos : {
+        "${prefixo}"       = { servico = servico, rota = "ANY /${prefixo}", caminho = "/${prefixo}" }
+        "${prefixo}-proxy" = { servico = servico, rota = "ANY /${prefixo}/{proxy+}", caminho = "/${prefixo}/{proxy}" }
+      }
+    ]...)
+  ]...)
 }

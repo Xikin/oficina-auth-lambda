@@ -41,7 +41,7 @@ resource "aws_apigatewayv2_integration" "api_proxy" {
 
   integration_type     = "HTTP_PROXY"
   integration_method   = "ANY"
-  integration_uri      = "http://${local.api_endpoint}/{proxy}"
+  integration_uri      = "http://${local.endpoints["os"]}/{proxy}"
   timeout_milliseconds = 29000
 
   request_parameters = {
@@ -53,6 +53,34 @@ resource "aws_apigatewayv2_route" "api_proxy" {
   api_id    = aws_apigatewayv2_api.this.id
   route_key = "ANY /{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.api_proxy.id}"
+}
+
+resource "aws_apigatewayv2_integration" "servicos" {
+  for_each = local.rotas
+  api_id   = aws_apigatewayv2_api.this.id
+
+  integration_type     = "HTTP_PROXY"
+  integration_method   = "ANY"
+  integration_uri      = "http://${local.endpoints[each.value.servico]}${each.value.caminho}"
+  timeout_milliseconds = 29000
+
+  request_parameters = {
+    "overwrite:header.x-request-id" = "$context.requestId"
+  }
+}
+
+resource "aws_apigatewayv2_route" "servicos" {
+  for_each  = local.rotas
+  api_id    = aws_apigatewayv2_api.this.id
+  route_key = each.value.rota
+  target    = "integrations/${aws_apigatewayv2_integration.servicos[each.key].id}"
+}
+
+resource "aws_ssm_parameter" "gateway_url" {
+  name        = "${local.ssm_prefix}/gateway/url"
+  description = "URL pública do API Gateway; usada pelo Billing como endereço do webhook do Mercado Pago"
+  type        = "String"
+  value       = trimsuffix(aws_apigatewayv2_stage.this.invoke_url, "/")
 }
 
 resource "aws_cloudwatch_log_group" "gateway" {

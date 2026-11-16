@@ -23,9 +23,9 @@ output "gateway_log_group" {
   value       = aws_cloudwatch_log_group.gateway.name
 }
 
-output "api_backend" {
-  description = "Backend para onde o gateway roteia as rotas da aplicação"
-  value       = nonsensitive(local.api_endpoint)
+output "backends" {
+  description = "Load Balancer de cada serviço para onde o gateway roteia"
+  value       = nonsensitive(local.endpoints)
 }
 
 output "exemplo_curl" {
