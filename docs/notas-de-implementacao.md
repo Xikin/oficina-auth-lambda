@@ -88,6 +88,11 @@ que a Lambda o recusa.
 - O access log é JSON de uma linha: é o formato que o New Relic e o CloudWatch Logs Insights consultam por campo,
   sem regex. O campo `path` fica de fora porque a URL crua carrega CPF/CNPJ em `/clientes/cpf-cnpj/:documento`; o
   caminho completo, já mascarado, fica no log da aplicação, ligado à linha do gateway pelo `requestId`.
+- As integrações sobrescrevem `x-request-id` com o `requestId` do gateway, para a linha do access log e a do serviço
+  terem o mesmo id. A exceção são as rotas de `/pagamentos` (`local.prefixos_com_request_id_do_chamador`): o Mercado
+  Pago assina o webhook com o `x-request-id` que ele mesmo envia (manifesto `id:…;request-id:…;ts:…;`), e com o header
+  trocado a assinatura nunca confere e o Billing recusa toda notificação com 401. Nessas rotas o serviço usa o id
+  recebido do chamador ou gera um próprio.
 
 ### `terraform/lambda.tf`
 
@@ -119,8 +124,10 @@ que a Lambda o recusa.
 
 ### `terraform/outputs.tf`
 
-`backends` usa `nonsensitive`: o provider marca todo valor lido do SSM como sensível, mas são só os hostnames
-públicos dos Load Balancers, não segredos.
+Os endpoints são lidos por `insecure_value`, e não por `value`: o provider marca todo `value` do SSM como sensível,
+mas são só os hostnames públicos dos Load Balancers, guardados como `String`. Com `value`, o output `backends`
+quebrava o plan ("Output refers to sensitive values"), porque `nonsensitive()` no mapa não remove a marca dos
+elementos.
 
 ### `terraform/api-gateway.tf` — rotas da Fase 4 e `gateway_url`
 

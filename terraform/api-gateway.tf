@@ -64,7 +64,7 @@ resource "aws_apigatewayv2_integration" "servicos" {
   integration_uri      = "http://${local.endpoints[each.value.servico]}${each.value.caminho}"
   timeout_milliseconds = 29000
 
-  request_parameters = {
+  request_parameters = contains(local.prefixos_com_request_id_do_chamador, split("-", each.key)[0]) ? null : {
     "overwrite:header.x-request-id" = "$context.requestId"
   }
 }
