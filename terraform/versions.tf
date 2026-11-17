@@ -55,6 +55,8 @@ locals {
     billing  = ["orcamentos", "pagamentos"]
   }
 
+  prefixos_com_request_id_do_chamador = ["pagamentos"]
+
   rotas = merge([
     for servico, prefixos in local.rotas_por_servico : merge([
       for prefixo in prefixos : {
