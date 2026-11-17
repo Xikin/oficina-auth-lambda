@@ -5,11 +5,11 @@
   "description": "Function serverless de autenticação por CPF da Oficina Mecânica",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
-    "build": "esbuild src/handler.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.mjs --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
-    "build:encaminhador": "esbuild src/encaminhador-logs.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/encaminhador-logs/index.mjs",
+    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.mjs --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "build:encaminhador": "esbuild src/encaminhador-logs.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/encaminhador-logs/index.mjs",
     "package": "npm run build && npm run build:encaminhador && (cd dist && zip -qr ../lambda.zip index.mjs) && (cd dist/encaminhador-logs && zip -qr ../../encaminhador-logs.zip index.mjs) && echo \"lambda.zip: $(du -h lambda.zip | cut -f1) | encaminhador-logs.zip: $(du -h encaminhador-logs.zip | cut -f1)\"",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -18,18 +18,16 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
   },
   "dependencies": {
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.13.1"
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "@types/jsonwebtoken": "^9.0.7",
-    "@types/node": "^22.0.0",
-    "@types/pg": "^8.11.10",
+    "@types/node": "^26.5.1",
     "@vitest/coverage-v8": "^2.1.8",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.5",
-    "typescript": "^5.6.3",
+    "typescript": "^7.0.2",
     "vitest": "^2.1.8"
   }
 }

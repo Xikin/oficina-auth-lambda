@@ -13,19 +13,19 @@ arquivo.
 - O segredo usado para assinar é o `JWT_CLIENTE_SECRET`, exclusivo do emissor de clientes. **Não** é o
   `JWT_SECRET` da API: com um segredo compartilhado, quem lesse a configuração desta função forjaria tokens de
   ADMIN ([ADR-0011 em oficina-mvp](https://github.com/Xikin/tech_challenge/blob/main/docs/adr/0011-segredos-jwt-por-emissor.md)).
-- Falha de rede ou timeout com o RDS cai no `catch` e responde 503, que sinaliza ao chamador que vale tentar de
-  novo, ao contrário de um 500 genérico.
+- Falha de rede, timeout ou chave recusada pelo OS Service cai no `catch` e responde 503, que sinaliza ao chamador
+  que vale tentar de novo, ao contrário de um 500 genérico. O motivo detalhado fica só no log.
 
-### `src/db.ts`
+### `src/clientes.ts`
 
-- `pg` direto em vez do Prisma: o Prisma Client empacotado passa de 40 MB e pesa no cold start de uma função que
-  faz uma única consulta de leitura.
-- O `Pool` fica no escopo do módulo: invocações "quentes" reaproveitam a conexão TCP e o handshake TLS. `max: 1`
-  porque cada container atende uma invocação por vez e o db.t3.micro tem um teto baixo de conexões.
-- `connectionTimeoutMillis: 3000`: se o RDS não responder, é melhor falhar rápido e devolver 503 do que segurar a
-  invocação até o timeout de 10s da função.
-- `ssl: { rejectUnauthorized: false }`: o RDS exige TLS, e o certificado é da CA da Amazon, que não está no bundle
-  da Lambda. O trade-off está no [ADR-0006](adr/0006-segredos-da-lambda.md).
+- Substitui o antigo `db.ts` (Fase 4): a função não lê mais a tabela `clientes`, pergunta ao OS Service, que é o dono
+  do dado ([ADR-0013 em oficina-mvp](https://github.com/Xikin/tech_challenge/blob/main/docs/adr/0013-divisao-em-tres-microsservicos.md)).
+- `POST` com o CPF no corpo, não na URL: CPF em caminho apareceria no access log do Load Balancer e do serviço.
+- `x-api-key` = `INTEGRACAO_API_KEY`, gerada pelo pipeline do OS Service no SSM e lida pelo Terraform daqui. O
+  `x-request-id` é repassado para a chamada aparecer correlacionada nos logs do OS Service.
+- Timeout de 3 s (`OS_SERVICE_TIMEOUT_MS`): melhor falhar rápido com 503 do que segurar a invocação até o timeout
+  de 10 s da função.
+- 404 do OS Service vira `null` (cliente não cadastrado); qualquer outro status vira erro de indisponibilidade.
 
 ### `src/cpf.ts`
 
@@ -92,11 +92,12 @@ que a Lambda o recusa.
 ### `terraform/lambda.tf`
 
 - `reserved_concurrent_executions` limita o estrago de uma força bruta: sem teto, a função escala até o limite da
-  conta e esgota as conexões do RDS, derrubando também a API.
-- `vpc_config`: sem a ENI na VPC, a função não alcança o RDS, que vive em subnet privada. O security group anexado
-  é o "crachá" publicado por oficina-infra-db: quem o anexa fala com o banco.
-- `DATABASE_URL` e `JWT_CLIENTE_SECRET` são injetados no deploy, em vez de lidos do Secrets Manager em runtime,
-  porque a subnet privada não tem NAT nem VPC Endpoint ([ADR-0006](adr/0006-segredos-da-lambda.md)).
+  conta e despeja toda a carga no OS Service.
+- **Sem `vpc_config` desde a Fase 4.** A função só precisava da VPC para alcançar o RDS. Agora chama o Load
+  Balancer do OS Service, que é público, e a VPC não tem NAT: dentro dela a função não teria saída.
+- `OS_SERVICE_URL`, `INTEGRACAO_API_KEY` e `JWT_CLIENTE_SECRET` são injetados no deploy, em vez de lidos em runtime
+  ([ADR-0006](adr/0006-segredos-da-lambda.md)).
+- Runtime `nodejs22.x`: o `nodejs20.x` saiu de suporte em 2026.
 - `log_format = "JSON"`: o handler já emite JSON; a configuração alinha os logs da plataforma.
 
 ### `terraform/newrelic-logs.tf`
@@ -110,13 +111,22 @@ que a Lambda o recusa.
 
 ### `terraform/versions.tf`
 
-O parâmetro `/oficina/<env>/api/endpoint` é preenchido pelo pipeline de deploy da API depois que o Load Balancer
-sobe.
+- Os parâmetros `/oficina/<env>/{os,execucao,billing}/endpoint` nascem com valor provisório no `oficina-infra-k8s` e
+  são preenchidos pelo pipeline de cada serviço quando o Load Balancer sobe. Assim, este Terraform não falha por
+  parâmetro inexistente se for aplicado antes de algum serviço.
+- `local.rotas` gera duas rotas por prefixo (`ANY /execucoes` e `ANY /execucoes/{proxy+}`): no HTTP API, `{proxy+}`
+  não casa com o caminho vazio, e sem a primeira rota `GET /execucoes` cairia no OS Service.
 
 ### `terraform/outputs.tf`
 
-`api_backend` usa `nonsensitive`: o provider marca todo valor lido do SSM como sensível, mas este é só o hostname
-público do Load Balancer — não é segredo.
+`backends` usa `nonsensitive`: o provider marca todo valor lido do SSM como sensível, mas são só os hostnames
+públicos dos Load Balancers, não segredos.
+
+### `terraform/api-gateway.tf` — rotas da Fase 4 e `gateway_url`
+
+As rotas específicas (`/orcamentos`, `/execucoes`...) têm prioridade sobre `ANY /{proxy+}` no HTTP API, então o OS
+Service continua recebendo tudo o que não é de outro serviço. `aws_ssm_parameter.gateway_url` publica a URL do
+stage: o Billing a usa como `notification_url` do Mercado Pago, que precisa de HTTPS público.
 
 ---
 

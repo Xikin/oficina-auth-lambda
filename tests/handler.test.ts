@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import type { APIGatewayProxyEventV2, Context } from 'aws-lambda';
 
 const buscarClientePorCPF = vi.fn();
-vi.mock('../src/db.js', () => ({ buscarClientePorCPF }));
+vi.mock('../src/clientes.js', () => ({ buscarClientePorCPF }));
 
 const { handler } = await import('../src/handler.js');
 
@@ -66,7 +66,7 @@ describe('POST /auth/cpf — passo 1: validação do CPF', () => {
   it('aceita CPF com máscara e normaliza antes de consultar', async () => {
     buscarClientePorCPF.mockResolvedValue({ id: 'c1', nome: 'Ana', email: null, ativo: true });
     await handler(evento({ cpf: '529.982.247-25' }), contexto);
-    expect(buscarClientePorCPF).toHaveBeenCalledWith(CPF_VALIDO);
+    expect(buscarClientePorCPF).toHaveBeenCalledWith(CPF_VALIDO, expect.any(String));
   });
 });
 

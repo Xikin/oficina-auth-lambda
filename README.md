@@ -1,19 +1,26 @@
 # oficina-auth-lambda
 
 **Function serverless de autenticação por CPF** e **API Gateway** da Oficina Mecânica.
-Repositório 1 de 4 do Tech Challenge — Fase 3.
+Tech Challenge — Fase 4.
 
-Este repositório entrega os dois componentes que passam a ficar na frente de toda a
-plataforma: a função que autentica o cliente final pelo CPF e emite o JWT, e o
-gateway que é o ponto único de entrada — roteando `/auth/cpf` para a função e todo o
-resto para a API que roda no EKS.
+Este repositório entrega os dois componentes que ficam na frente de toda a plataforma:
+
+- a função que autentica o cliente final pelo CPF e emite o JWT;
+- o gateway, ponto único de entrada, que roteia `/auth/cpf` para a função e cada prefixo para o microsserviço dono dele.
+
+> **Fase 4:** a função não lê mais o banco. Ela pergunta ao OS Service
+> (`POST /integracao/clientes/identificar`, com chave de integração), que é o dono dos
+> clientes, e saiu da VPC: não precisa mais alcançar o RDS
+> ([ADR-0013](https://github.com/Xikin/tech_challenge/blob/main/docs/adr/0013-divisao-em-tres-microsservicos.md)).
 
 | Repositório | Papel |
 | --- | --- |
-| **oficina-auth-lambda** (este) | Function serverless de autenticação por CPF + API Gateway |
-| [oficina-infra-k8s](https://github.com/Xikin/oficina-infra-k8s) | VPC + cluster EKS + metrics-server |
-| [oficina-infra-db](https://github.com/Xikin/oficina-infra-db) | RDS PostgreSQL gerenciado |
-| [oficina-mvp](https://github.com/Xikin/tech_challenge) | Aplicação principal executando no cluster |
+| **oficina-auth-lambda** (este) | Autenticação por CPF + API Gateway |
+| [oficina-mvp](https://github.com/Xikin/tech_challenge) | OS Service — clientes, veículos, OS, orquestração da saga |
+| [oficina-execucao](https://github.com/Xikin/oficina-execucao) | Execução e Produção |
+| [oficina-billing](https://github.com/Xikin/oficina-billing) | Orçamento e Pagamento |
+| [oficina-infra-k8s](https://github.com/Xikin/oficina-infra-k8s) | VPC, EKS, ECR, RabbitMQ |
+| [oficina-infra-db](https://github.com/Xikin/oficina-infra-db) | RDS do OS Service e do Execução |
 
 ---
 
@@ -21,37 +28,42 @@ resto para a API que roda no EKS.
 
 ```mermaid
 flowchart LR
-    cliente(["Cliente final<br/>(app / navegador)"])
+    cliente(["Cliente / Oficina"])
 
     subgraph aws["AWS · us-east-1"]
         subgraph gw["API Gateway HTTP API"]
-            r1["POST /auth/cpf<br/>rota pública"]
-            r2["ANY /{proxy+}<br/>rota da aplicação"]
+            r1["POST /auth/cpf"]
+            r2["/execucoes · /servicos · /pecas"]
+            r3["/orcamentos · /pagamentos"]
+            r4["ANY /{proxy+}"]
         end
 
-        subgraph priv["Subnets privadas"]
-            lambda["Lambda oficina-auth<br/>Node.js 20 · 512MB<br/>bundle 315KB"]
-            rds[("RDS PostgreSQL<br/>tabela clientes")]
-        end
-
-        nlb["Load Balancer<br/>do Service da API"]
-        eks["Pods da API<br/>no EKS"]
+        lambda["Lambda oficina-auth<br/>Node.js 22 · fora da VPC"]
+        os["NLB do OS Service"]
+        ex["NLB do Execução"]
+        bi["NLB do Billing"]
         cw[("CloudWatch Logs<br/>+ X-Ray")]
     end
 
-    cliente -->|"1. POST cpf"| r1
-    r1 --> lambda
-    lambda -->|"2. SELECT por cpf_cnpj"| rds
-    lambda -->|"3. JWT role=CLIENTE"| r1
-    r1 -->|"token"| cliente
-
-    cliente -->|"4. Bearer token"| r2
-    r2 --> nlb --> eks
-    eks -->|"valida assinatura<br/>+ checa dono do recurso"| eks
-
-    lambda -.->|"logs JSON<br/>+ traces"| cw
-    gw -.->|"access logs"| cw
+    cliente -->|"1. POST cpf"| r1 --> lambda
+    lambda -->|"2. identificar cliente<br/>x-api-key"| os
+    lambda -->|"3. JWT role=CLIENTE"| cliente
+    cliente -->|"Bearer token"| r2 & r3 & r4
+    r2 --> ex
+    r3 --> bi
+    r4 --> os
+    lambda -.-> cw
+    gw -.->|access logs| cw
 ```
+
+| Rota no gateway | Destino |
+| --- | --- |
+| `POST /auth/cpf` | Esta Lambda |
+| `/execucoes`, `/servicos`, `/pecas` (e subcaminhos) | Execução e Produção |
+| `/orcamentos`, `/pagamentos` (e subcaminhos) | Orçamento e Pagamento; o webhook do Mercado Pago chega em `/pagamentos/webhook` |
+| todo o resto | OS Service |
+
+O endereço de cada serviço vem do SSM (`/oficina/<env>/<servico>/endpoint`), publicado pelo pipeline do serviço. A URL do gateway é publicada em `/oficina/<env>/gateway/url`, de onde o Billing tira o endereço do webhook.
 
 ### Fluxo de autenticação — diagrama de sequência
 
@@ -61,8 +73,8 @@ sequenceDiagram
     actor C as Cliente
     participant G as API Gateway
     participant L as Lambda auth
-    participant D as RDS PostgreSQL
-    participant A as API (EKS)
+    participant D as OS Service
+    participant A as Serviços (EKS)
 
     C->>G: POST /auth/cpf { cpf }
     G->>L: invoke (payload 2.0, x-request-id)
@@ -73,14 +85,14 @@ sequenceDiagram
     end
 
     Note over L: Passo 2 — existência e status
-    L->>D: SELECT id, nome, email, ativo<br/>FROM clientes WHERE cpf_cnpj = $1
-    D-->>L: linha ou vazio
+    L->>D: POST /integracao/clientes/identificar<br/>x-api-key
+    D-->>L: 200 { id, nome, email, ativo } ou 404
 
     alt cliente não existe
         L-->>C: 404 CLIENT_NOT_FOUND
     else cliente inativo
         L-->>C: 403 CLIENT_INACTIVE
-    else banco inacessível
+    else OS Service inacessível ou chave inválida
         L-->>C: 503 AUTH_UNAVAILABLE
     end
 
@@ -97,22 +109,19 @@ sequenceDiagram
 
 ### Decisões que valem explicar
 
-**`pg` em vez de Prisma.** O Prisma Client com o engine nativo passa de 40 MB; o
-bundle desta função tem **315 KB**, o que mantém o cold start em ~300ms. A Lambda faz
-uma única consulta de leitura — não precisa de ORM. O schema continua sendo
-propriedade da API, que é quem roda `prisma migrate deploy`.
-
-**Pool no escopo do módulo.** O `Pool` do `pg` é criado fora do handler, então
-invocações quentes reaproveitam a conexão TCP e o handshake TLS: ~300ms na primeira,
-~15ms nas seguintes. `max: 1` porque cada container atende uma invocação por vez e o
-`db.t3.micro` tem teto baixo de conexões.
+**HTTP em vez de banco.** Na Fase 3 a função lia `clientes` direto do RDS. Na Fase 4
+nenhum serviço pode acessar o banco de outro, então ela pergunta ao OS Service. A chamada
+tem timeout de 3 s, repassa o `x-request-id` e usa a chave `INTEGRACAO_API_KEY`, gerada
+pelo pipeline do OS Service no SSM. Sem banco, o bundle caiu de 315 KB para 28 KB e a
+função saiu da VPC. A VPC não tem NAT, então dentro dela a função não alcançaria o
+Load Balancer.
 
 **404 e 403 são respostas diferentes.** O requisito pede "consultar a existência **e
 o status**" — cliente inexistente devolve 404, cliente inativo devolve 403. Colapsar
 os dois num só código perderia a distinção que o enunciado pede.
 
 **Só CPF, sem CNPJ.** O validador da API aceita CPF ou CNPJ; aqui o ramo de CNPJ foi
-deliberadamente removido, e a consulta filtra `tipo_pessoa = 'FISICA'`. Autenticação
+deliberadamente removido, e o OS Service só identifica clientes `FISICA`. Autenticação
 de pessoa física não deve aceitar documento de pessoa jurídica.
 
 **CPF nunca aparece em log.** `mascararCPF` reduz para `***.***.247-25` antes de
@@ -125,12 +134,11 @@ nunca por um administrador ([ADR-0011](https://github.com/Xikin/tech_challenge/b
 
 **Concorrência reservada.** A função tem teto de 10 execuções simultâneas
 (`lambda_reserved_concurrency`). Sem ele, uma força bruta de CPF escalaria até o limite da
-conta e esgotaria as conexões do RDS, derrubando a API junto.
+conta e despejaria a carga no OS Service.
 
 **Segredos por variável de ambiente.** Ver
-[ADR-0006](docs/adr/0006-segredos-da-lambda.md) — a subnet privada não tem NAT nem
-VPC Endpoint, então ler o Secrets Manager em runtime seria impossível sem custo fixo
-adicional.
+[ADR-0006](docs/adr/0006-segredos-da-lambda.md). A chave de integração e o endereço do
+OS Service são lidos do SSM pelo Terraform no deploy, não em runtime.
 
 ---
 
@@ -138,13 +146,13 @@ adicional.
 
 | Camada | Tecnologia |
 | --- | --- |
-| Runtime | Node.js 20 (ESM), TypeScript 5.6 |
-| Bundle | esbuild — artefato único de ~315 KB |
-| Banco | `pg` (node-postgres) contra RDS PostgreSQL |
+| Runtime | Node.js 22 (ESM), TypeScript |
+| Bundle | esbuild — artefato único de ~28 KB |
+| Clientes | HTTP para o OS Service (`fetch` nativo) |
 | Token | `jsonwebtoken` (HS256), compatível com `@fastify/jwt` da API |
 | Gateway | AWS API Gateway **HTTP API** (v2) |
 | IaC | Terraform ~> 1.10, backend S3 |
-| Testes | Vitest — 24 testes, cobertura mínima de 80% |
+| Testes | Vitest — 43 testes, 99,7% de cobertura (mínimo 80%) |
 | Observabilidade | Logs JSON + AWS X-Ray + access logs do gateway |
 
 ---
@@ -176,7 +184,7 @@ adicional.
 | 404 | `CLIENT_NOT_FOUND` | CPF válido, mas sem cadastro |
 | 403 | `CLIENT_INACTIVE` | cliente existe, porém inativo |
 | 500 | `MISCONFIGURED` | `JWT_CLIENTE_SECRET` ausente na função |
-| 503 | `AUTH_UNAVAILABLE` | RDS inacessível ou timeout |
+| 503 | `AUTH_UNAVAILABLE` | OS Service inacessível, timeout ou chave de integração inválida |
 
 Toda resposta — inclusive as de erro — devolve o header `x-request-id` para
 correlação com os logs.
@@ -198,12 +206,9 @@ correlação com os logs.
 
 ### Swagger / Postman
 
-A especificação completa da plataforma (esta rota e todas as da aplicação) está em
-[oficina-mvp](https://github.com/Xikin/tech_challenge):
-
-- Swagger UI: `<API_GATEWAY_URL>/docs`
-- OpenAPI: [`docs/openapi.json`](https://github.com/Xikin/tech_challenge/blob/main/docs/openapi.json)
-- Collection Postman: [`postman/`](https://github.com/Xikin/tech_challenge/blob/main/postman)
+Cada microsserviço publica o próprio OpenAPI (`docs/openapi.json`) e coleção Postman (`postman/`):
+[OS Service](https://github.com/Xikin/tech_challenge), [Execução](https://github.com/Xikin/oficina-execucao)
+e [Billing](https://github.com/Xikin/oficina-billing). Swagger do OS Service: `<API_GATEWAY_URL>/docs`.
 
 ---
 
@@ -211,26 +216,28 @@ A especificação completa da plataforma (esta rota e todas as da aplicação) e
 
 ```bash
 npm ci
-npm test          # 24 testes, sem precisar de AWS nem banco
+npm test          # 43 testes, sem precisar de AWS nem do OS Service
 npm run typecheck
 npm run package   # gera lambda.zip
 ```
 
-Os testes fazem mock do módulo de banco, então rodam offline.
+Os testes simulam o OS Service (`fetch`), então rodam offline.
 
 ---
 
 ## Deploy
 
-> **Ordem obrigatória.** Esta é a **última** stack a subir: ela lê do SSM as subnets
-> privadas (`oficina-infra-k8s`), o security group e a `DATABASE_URL`
-> (`oficina-infra-db`) e o endereço do Load Balancer (`oficina-mvp`). O pipeline
-> verifica os quatro parâmetros antes de aplicar e falha com mensagem explícita se
-> algum faltar.
+> **Ordem obrigatória.** Esta é a **última** stack a subir: ela lê do SSM o endereço
+> dos três serviços e a chave de integração gerada pelo deploy do OS Service. Os
+> parâmetros de endereço já existem com valor provisório desde o `oficina-infra-k8s`; o
+> pipeline confere todos antes de aplicar.
 
 ```
-oficina-infra-k8s  ->  oficina-infra-db  ->  oficina-mvp  ->  oficina-auth-lambda
+oficina-infra-k8s -> oficina-infra-db -> oficina-mvp -> oficina-execucao -> oficina-billing -> oficina-auth-lambda
 ```
+
+Depois do primeiro apply, refaça o deploy do Billing para que ele leia `/gateway/url`
+e o webhook do Mercado Pago aponte para o gateway.
 
 ```bash
 npm run package
@@ -241,7 +248,7 @@ terraform init \
   -backend-config="region=us-east-1" \
   -backend-config="key=auth-lambda/prod/terraform.tfstate"
 
-export TF_VAR_jwt_cliente_secret='<o MESMO JWT_CLIENTE_SECRET da API>'
+export TF_VAR_jwt_cliente_secret='<o MESMO JWT_CLIENTE_SECRET do OS Service>'
 terraform apply
 
 terraform output -raw exemplo_curl
@@ -257,7 +264,7 @@ terraform output -raw exemplo_curl
 | `workflow_dispatch` com `destroy` | `terraform destroy` do ambiente da branch |
 
 O smoke test envia um CPF inválido ao ambiente recém-publicado e exige HTTP 422 —
-prova que gateway e função estão de pé sem depender de haver cliente no banco.
+prova que gateway e função estão de pé sem depender de haver cliente cadastrado.
 
 ### Secrets necessários no repositório
 

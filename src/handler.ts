@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context } from 'aws-lambda';
 import { limparCPF, mascararCPF, validarCPF } from './cpf.js';
-import { buscarClientePorCPF } from './db.js';
+import { buscarClientePorCPF } from './clientes.js';
 import { emitirToken } from './token.js';
 import { log, type ContextoLog } from './logger.js';
 
@@ -78,7 +78,7 @@ export async function handler(
       return erro({ status: 422, codigo: 'CPF_INVALID', mensagem: 'CPF inválido' }, correlationId);
     }
 
-    const cliente = await buscarClientePorCPF(cpf);
+    const cliente = await buscarClientePorCPF(cpf, correlationId);
 
     if (!cliente) {
       log.warn('cliente não encontrado', { ...ctx, cpf: mascararCPF(cpf) });
