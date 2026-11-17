@@ -25,7 +25,7 @@ output "gateway_log_group" {
 
 output "backends" {
   description = "Load Balancer de cada serviço para onde o gateway roteia"
-  value       = nonsensitive(local.endpoints)
+  value       = local.endpoints
 }
 
 output "exemplo_curl" {

@@ -48,7 +48,7 @@ data "aws_ssm_parameter" "integracao_api_key" {
 }
 
 locals {
-  endpoints = { for servico, p in data.aws_ssm_parameter.endpoint : servico => p.value }
+  endpoints = { for servico, p in data.aws_ssm_parameter.endpoint : servico => p.insecure_value }
 
   rotas_por_servico = {
     execucao = ["execucoes", "servicos", "pecas"]
