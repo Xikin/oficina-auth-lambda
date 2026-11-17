@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import type { ClienteAutenticavel } from './db.js';
+import type { ClienteAutenticavel } from './clientes.js';
 
 export interface PayloadCliente {
   sub: string;

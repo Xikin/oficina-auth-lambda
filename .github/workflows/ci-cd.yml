@@ -22,7 +22,7 @@ permissions:
 env:
   AWS_REGION: us-east-1
   TF_VERSION: "1.10.5"
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   TF_VAR_environment: ${{ github.ref_name == 'main' && 'prod' || 'homolog' }}
 
 jobs:
@@ -110,15 +110,15 @@ jobs:
         run: |
           faltando=""
           for p in \
-            "/oficina/${TF_VAR_environment}/network/private_subnet_ids" \
-            "/oficina/${TF_VAR_environment}/db/client_security_group_id" \
-            "/oficina/${TF_VAR_environment}/db/database_url" \
-            "/oficina/${TF_VAR_environment}/api/endpoint"
+            "/oficina/${TF_VAR_environment}/os/endpoint" \
+            "/oficina/${TF_VAR_environment}/execucao/endpoint" \
+            "/oficina/${TF_VAR_environment}/billing/endpoint" \
+            "/oficina/${TF_VAR_environment}/auth/integracao_api_key"
           do
             aws ssm get-parameter --name "$p" >/dev/null 2>&1 || faltando="$faltando\n  - $p"
           done
           if [ -n "$faltando" ]; then
-            echo -e "::error::Parâmetros ausentes no SSM:$faltando\n\nAplique primeiro oficina-infra-k8s e depois oficina-infra-db."
+            echo -e "::error::Parâmetros ausentes no SSM:$faltando\n\nAplique oficina-infra-k8s e faça o deploy do OS Service (que gera a chave de integração e publica o endereço)."
             exit 1
           fi
 
